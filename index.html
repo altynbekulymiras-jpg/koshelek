@@ -1129,6 +1129,28 @@ renderSync();
 renderBackup();
 drawNote();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){refit();drawNote()});
+/* ---------- quick add from a link (used by the Siri / Shortcuts flow) ----------
+   Example: .../koshelek/?add=out&sum=1500&cat=food&note=такси */
+function quickAdd(){
+  var q;
+  try{q=new URLSearchParams(location.search)}catch(e){return}
+  if(!q.has('add'))return;
+  var type=q.get('add')==='in'?'in':q.get('add')==='out'?'out':null;
+  var sum=parseSum(String(q.get('sum')||'').replace(/\s/g,''));
+  history.replaceState(null,'',location.pathname);
+  if(!type||isNaN(sum)||!(sum>0)||sum>MAX_SUM){toast('Не удалось записать: проверьте сумму',null,null,4000);return}
+  var cat=q.get('cat')||'';
+  if(!catInfo(type,cat)||catInfo(type,cat)[0]!==cat)cat=CATS[type][CATS[type].length-1][0];
+  var d=iso(new Date());
+  var raw=q.get('date')||'';
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw)&&!isNaN(parseDate(raw).getTime()))d=raw;
+  var t={id:uid(),type:type,cat:cat,sum:sum,note:String(q.get('note')||'').trim().slice(0,60),date:d};
+  addTx(t);
+  var dd=parseDate(d);view=new Date(dd.getFullYear(),dd.getMonth(),1);
+  commit();
+  toast((type==='in'?'Приход':'Расход')+' записан: '+fmt(sum)+' ₸');
+}
+quickAdd();
 connect();
 })();
 </script>
