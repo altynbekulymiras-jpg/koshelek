@@ -1130,7 +1130,7 @@ renderBackup();
 drawNote();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){refit();drawNote()});
 /* ---------- quick add from a link (used by the Siri / Shortcuts flow) ----------
-   Example: .../koshelek/?add=out&sum=1500&cat=food&note=такси */
+   Example: .../koshelek/?add=out&sum=1500&cat=Транспорт&note=такси (category by name or key) */
 function quickAdd(){
   var q;
   try{q=new URLSearchParams(location.search)}catch(e){return}
@@ -1139,8 +1139,13 @@ function quickAdd(){
   var sum=parseSum(String(q.get('sum')||'').replace(/\s/g,''));
   history.replaceState(null,'',location.pathname);
   if(!type||isNaN(sum)||!(sum>0)||sum>MAX_SUM){toast('Не удалось записать: проверьте сумму',null,null,4000);return}
-  var cat=q.get('cat')||'';
-  if(!catInfo(type,cat)||catInfo(type,cat)[0]!==cat)cat=CATS[type][CATS[type].length-1][0];
+  var cat=String(q.get('cat')||'').trim().toLowerCase().replace(/ё/g,'е');
+  var found=null;
+  CATS[type].forEach(function(c){
+    if(found)return;
+    if(c[0]===cat||c[1].toLowerCase().replace(/ё/g,'е')===cat)found=c[0];
+  });
+  cat=found||CATS[type][CATS[type].length-1][0];
   var d=iso(new Date());
   var raw=q.get('date')||'';
   if(/^\d{4}-\d{2}-\d{2}$/.test(raw)&&!isNaN(parseDate(raw).getTime()))d=raw;
