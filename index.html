@@ -1129,11 +1129,58 @@ renderSync();
 renderBackup();
 drawNote();
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(function(){refit();drawNote()});
+/* ---------- voice phrase: "на автобус 80 тенге", "зарплата 300000" ----------
+   Finds a category by keywords inside the phrase; the number is the sum. */
+var KEYWORDS={
+  out:[
+    ['food',['еда','продукт','магазин','кафе','ресторан','обед','ужин','завтрак','хлеб','молок','кофе','пицц','шаурм','мясо','овощ','фрукт','супермаркет','маркет','кушать']],
+    ['transport',['автобус','такси','метро','проезд','бензин','заправ','транспорт','троллейбус','маршрутк','парков','поезд','самолет','самолёт','электрич','каршеринг']],
+    ['home',['аренд','квартир','жиль','коммунал','свет','электричеств','газ','вода','ремонт','мебел','ипотек','квартплат']],
+    ['phone',['телефон','связ','интернет','сим','тариф','мобил','wifi','вайфай','пополнен','номер']],
+    ['clothes',['одежд','обув','куртк','джинс','кроссов','футболк','платье','ботинк','кофт']],
+    ['health',['аптек','лекарств','врач','больниц','стомат','анализ','таблет','здоровь','витамин','клиник']],
+    ['fun',['кино','игр','развлеч','концерт','досуг','подписк','боулинг','театр','бар']]
+  ],
+  in:[
+    ['salary',['зарплат','оклад','аванс']],
+    ['side',['подработ','заказ','фриланс','халтур','подрабат']],
+    ['biz',['бизнес','продаж','клиент','прибыл','продал']],
+    ['gift',['подарил','подарок','перевел','перевели','дали']]
+  ]
+};
+var INCOME_WORDS=['приход','доход','пришл','получил','зарплат','аванс','заработ','подарил','перевел','перевели','продал','продаж','оклад'];
+function norm(s){return String(s).toLowerCase().replace(/ё/g,'е')}
+function parseSay(text){
+  var t=norm(text).replace(/\s+/g,' ').trim();
+  var m=t.match(/\d+(?:[   ]\d{3})*(?:[.,]\d{1,2})?/);
+  if(!m)return null;
+  var sum=parseSum(m[0].replace(/[   ]/g,''));
+  if(isNaN(sum)||!(sum>0)||sum>MAX_SUM)return null;
+  var type='out';
+  for(var i=0;i<INCOME_WORDS.length;i++)if(t.indexOf(INCOME_WORDS[i])>=0){type='in';break}
+  var cat=null,list=KEYWORDS[type];
+  for(var k=0;k<list.length&&!cat;k++){
+    for(var w=0;w<list[k][1].length;w++)if(t.indexOf(list[k][1][w])>=0){cat=list[k][0];break}
+  }
+  if(!cat)cat=CATS[type][CATS[type].length-1][0];
+  return {type:type,sum:sum,cat:cat,note:String(text).trim().slice(0,60)};
+}
 /* ---------- quick add from a link (used by the Siri / Shortcuts flow) ----------
    Example: .../koshelek/?add=out&sum=1500&cat=Транспорт&note=такси (category by name or key) */
 function quickAdd(){
   var q;
   try{q=new URLSearchParams(location.search)}catch(e){return}
+  if(q.has('say')){
+    var said=q.get('say')||'';
+    history.replaceState(null,'',location.pathname);
+    var r=parseSay(said);
+    if(!r){toast('Не поняла сумму. Скажите, например: на автобус 80 тенге',null,null,4500);return}
+    var rd=iso(new Date());
+    addTx({id:uid(),type:r.type,cat:r.cat,sum:r.sum,note:r.note,date:rd});
+    commit();
+    toast((r.type==='in'?'Приход':'Расход')+' записан: '+catInfo(r.type,r.cat)[1]+', '+fmt(r.sum)+' ₸');
+    return;
+  }
   if(!q.has('add'))return;
   var type=q.get('add')==='in'?'in':q.get('add')==='out'?'out':null;
   var sum=parseSum(String(q.get('sum')||'').replace(/\s/g,''));
