@@ -255,6 +255,8 @@ nav{position:relative;display:grid;grid-template-columns:repeat(3,1fr);backgroun
 .say-box .row{display:flex;gap:10px;margin-top:12px}
 .say-box button{flex:1;font:inherit;font-weight:600;padding:13px;border-radius:14px;border:0;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
 .say-box button.sec{background:var(--surface-2);color:inherit}
+.say-mic{width:100%;margin:0 0 12px;font-size:17px;padding:16px!important}
+.say-mic.rec{background:var(--out)!important;color:#fff!important}
 </style>
 </head>
 <body>
@@ -402,7 +404,7 @@ nav{position:relative;display:grid;grid-template-columns:repeat(3,1fr);backgroun
   </form>
 </div>
 
-<div class="say-bg" id="sayBg"><form class="say-box" id="sayForm" autocomplete="off"><h3>Что записать?</h3><p>Нажмите микрофон на клавиатуре и скажите, например: на автобус 80 тенге</p><input id="sayIn" type="text" enterkeyhint="done" placeholder="на автобус 80 тенге"><div class="row"><button type="button" class="sec" id="sayNo">Отмена</button><button type="submit">Записать</button></div></form></div>
+<div class="say-bg" id="sayBg"><form class="say-box" id="sayForm" autocomplete="off"><h3>Что записать?</h3><p>Нажмите микрофон на клавиатуре и скажите, например: на автобус 80 тенге</p><button type="button" class="say-mic" id="sayMic" hidden>🎤 Нажмите и говорите</button><input id="sayIn" type="text" enterkeyhint="done" placeholder="на автобус 80 тенге"><div class="row"><button type="button" class="sec" id="sayNo">Отмена</button><button type="submit">Записать</button></div></form></div>
 <script>
 (function(){
 'use strict';
@@ -1189,7 +1191,7 @@ function saySave(text){
 function askSay(v){
   var bg=document.getElementById('sayBg'),inp=document.getElementById('sayIn');
   inp.value=v||'';bg.classList.add('on');
-  setTimeout(function(){inp.focus()},150);
+  setTimeout(function(){if(window.sayListen&&!document.getElementById('sayMic').hidden)document.getElementById('sayMic').focus();else inp.focus()},150);
 }
 (function(){
   var bg=document.getElementById('sayBg'),inp=document.getElementById('sayIn');
@@ -1198,6 +1200,22 @@ function askSay(v){
     if(saySave(inp.value)){bg.classList.remove('on');inp.blur()}
     else{toast('Не поняла сумму. Например: на автобус 80 тенге',null,null,3500);inp.focus()}
   });
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition,mic=document.getElementById('sayMic'),rec=null;
+  function stopMic(){mic.classList.remove('rec');mic.textContent='🎤 Нажмите и говорите'}
+  window.sayListen=function(){
+    if(!SR)return;
+    try{rec&&rec.abort()}catch(e){}
+    rec=new SR();rec.lang='ru-RU';rec.interimResults=false;rec.maxAlternatives=1;
+    rec.onstart=function(){mic.classList.add('rec');mic.textContent='Слушаю… говорите'};
+    rec.onresult=function(ev){
+      var t=ev.results[0][0].transcript;inp.value=t;stopMic();
+      if(saySave(t)){bg.classList.remove('on');inp.blur()}else inp.focus();
+    };
+    rec.onerror=function(ev){stopMic();toast('Микрофон не сработал. Напишите фразу или нажмите 🎤 на клавиатуре',null,null,4000);inp.focus()};
+    rec.onend=stopMic;
+    try{rec.start()}catch(e){stopMic()}
+  };
+  if(SR){mic.hidden=false;mic.addEventListener('click',window.sayListen)}
   document.getElementById('sayNo').addEventListener('click',function(){bg.classList.remove('on');inp.blur()});
 })();
 function quickAdd(){
