@@ -245,6 +245,16 @@ nav{position:relative;display:grid;grid-template-columns:repeat(3,1fr);backgroun
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media (max-height:720px){.sheet{gap:10px}.cat-grid{gap:4px}.cat-btn{padding:8px 2px 6px;gap:4px}.cat-btn .tx-ic{width:36px;height:36px}.amount-wrap{padding:2px 0 8px}}
 @media (min-width:520px){#app{border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+
+.say-bg{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;padding:16px}
+.say-bg.on{display:flex}
+.say-box{width:100%;max-width:480px;background:var(--surface);color:var(--ink,var(--text));border:1px solid rgba(128,128,128,.25);border-radius:22px;padding:18px;margin-bottom:env(safe-area-inset-bottom)}
+.say-box h3{margin:0 0 4px;font-size:18px}
+.say-box p{margin:0 0 12px;font-size:13px;opacity:.7}
+.say-box input{width:100%;box-sizing:border-box;font:inherit;font-size:17px;padding:14px;border-radius:14px;border:1px solid rgba(128,128,128,.35);background:var(--surface-2);color:inherit}
+.say-box .row{display:flex;gap:10px;margin-top:12px}
+.say-box button{flex:1;font:inherit;font-weight:600;padding:13px;border-radius:14px;border:0;cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.say-box button.sec{background:var(--surface-2);color:inherit}
 </style>
 </head>
 <body>
@@ -392,6 +402,7 @@ nav{position:relative;display:grid;grid-template-columns:repeat(3,1fr);backgroun
   </form>
 </div>
 
+<div class="say-bg" id="sayBg"><form class="say-box" id="sayForm" autocomplete="off"><h3>Что записать?</h3><p>Нажмите микрофон на клавиатуре и скажите, например: на автобус 80 тенге</p><input id="sayIn" type="text" enterkeyhint="done" placeholder="на автобус 80 тенге"><div class="row"><button type="button" class="sec" id="sayNo">Отмена</button><button type="submit">Записать</button></div></form></div>
 <script>
 (function(){
 'use strict';
@@ -1167,18 +1178,36 @@ function parseSay(text){
 }
 /* ---------- quick add from a link (used by the Siri / Shortcuts flow) ----------
    Example: .../koshelek/?add=out&sum=1500&cat=Транспорт&note=такси (category by name or key) */
+function saySave(text){
+  var r=parseSay(text);
+  if(!r)return false;
+  addTx({id:uid(),type:r.type,cat:r.cat,sum:r.sum,note:r.note,date:iso(new Date())});
+  commit();
+  toast((r.type==='in'?'Приход':'Расход')+' записан: '+catInfo(r.type,r.cat)[1]+', '+fmt(r.sum)+' ₸');
+  return true;
+}
+function askSay(v){
+  var bg=document.getElementById('sayBg'),inp=document.getElementById('sayIn');
+  inp.value=v||'';bg.classList.add('on');
+  setTimeout(function(){inp.focus()},150);
+}
+(function(){
+  var bg=document.getElementById('sayBg'),inp=document.getElementById('sayIn');
+  document.getElementById('sayForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    if(saySave(inp.value)){bg.classList.remove('on');inp.blur()}
+    else{toast('Не поняла сумму. Например: на автобус 80 тенге',null,null,3500);inp.focus()}
+  });
+  document.getElementById('sayNo').addEventListener('click',function(){bg.classList.remove('on');inp.blur()});
+})();
 function quickAdd(){
   var q;
   try{q=new URLSearchParams(location.search)}catch(e){return}
   if(q.has('say')){
     var said=q.get('say')||'';
     history.replaceState(null,'',location.pathname);
-    var r=parseSay(said);
-    if(!r){toast('Не поняла сумму. Скажите, например: на автобус 80 тенге',null,null,4500);return}
-    var rd=iso(new Date());
-    addTx({id:uid(),type:r.type,cat:r.cat,sum:r.sum,note:r.note,date:rd});
-    commit();
-    toast((r.type==='in'?'Приход':'Расход')+' записан: '+catInfo(r.type,r.cat)[1]+', '+fmt(r.sum)+' ₸');
+    if(!said.trim()||said==='?'){askSay('');return}
+    if(!saySave(said))askSay(said);
     return;
   }
   if(!q.has('add'))return;
